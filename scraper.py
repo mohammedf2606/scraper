@@ -1,62 +1,41 @@
-from html.parser import HTMLParser
-from urllib.error import HTTPError
-from urllib.parse import urljoin, urlparse, urlunparse
-from urllib.request import urlopen
-import sys
+from requests import get
+from requests.exceptions import RequestException
+from contextlib import closing
+from bs4 import BeautifulSoup
 
 
-class Analyzer(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.links = []
+def simple_get(url):
+    """
+    Attempts to get the content at `url` by making an HTTP GET request.
+    If the content-type of response is some kind of HTML/XML, return the
+    text content, otherwise return None.
+    """
+    try:
+        with closing(get(url, stream=True)) as resp:
+            if is_good_response(resp):
+                return resp.content
+            else:
+                return None
 
-    def handle_starttag(self, tags, attrs):
-        if tags == "a":
-            for k, v in attrs:
-                if k == "href":
-                    self.links.append(v)
+    except RequestException as e:
+        log_error('Error during requests to {0} : {1}'.format(url, str(e)))
+        return None
 
-def spider(start_url):
-    todo = [start_url]
-    seen = set()
 
-    while len(todo) > 0:
-        bu = todo.pop()
+def is_good_response(resp):
+    """
+    Returns True if the response seems to be HTML, False otherwise.
+    """
+    content_type = resp.headers['Content-Type'].lower()
+    return (resp.status_code == 200
+            and content_type is not None
+            and content_type.find('html') > -1)
 
-        bu_split = list(urlparse(bu))
-        bu_split[5] = ""
-        bu = urlunparse(bu_split)
 
-        if bu in seen:
-            continue
-        seen.add(bu)
-
-        print(bu, end=" ")
-
-        try:
-            f = urlopen(bu)
-        except HTTPError:
-            print("<failed to load>")
-            continue
-        d = f.read()
-        f.close()
-
-        ct = f.info()["Content-Type"]
-        if ct is None or not ct.startswith("text/html"):
-            print("<skipping>")
-            continue
-
-        an = Analyzer()
-        an.feed(str(d))
-
-        for l in an.links:
-            full_url = urljoin(bu, l)
-            if not full_url.startswith(start_url):
-                continue
-
-            todo.append(full_url)
-
-        print("<processed %d links>" % len(set(an.links)))
-    print("Total: %s links" % len(seen))
-
-spider(sys.argv[1])
+def log_error(e):
+    """
+    It is always a good idea to log errors.
+    This function just prints them, but you can
+    make it do anything.
+    """
+    print(e)
