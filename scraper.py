@@ -3,7 +3,6 @@ from requests.exceptions import RequestException
 from contextlib import closing
 from bs4 import BeautifulSoup
 
-
 def simple_get(url):
     """
     Attempts to get the content at `url` by making an HTTP GET request.
@@ -49,17 +48,19 @@ def get_names():
     url = 'http://www.fabpedigree.com/james/mathmen.htm'
     response = simple_get(url)
 
-    if response is not None:
-        html = BeautifulSoup(response, 'html.parser')
-        names = set()
-        for li in html.select('li'):
-            for name in li.text.split('\n'):
-                if len(name) > 0:
-                    names.add(name.strip())
-        return list(names)
+    try:
+        if response is not None:
+            html = BeautifulSoup(response, 'html.parser')
+            names = set()
+            for li in html.select('li'):
+                for name in li.text.split('\n'):
+                    if len(name) > 0:
+                        names.add(name.strip())
+            return list(names)
+    except response is None:
+        # Raise an exception if we failed to get any data from the url
+        raise Exception('Error retrieving contents at {}'.format(url))
 
-    # Raise an exception if we failed to get any data from the url
-    raise Exception('Error retrieving contents at {}'.format(url))
 
 def get_hits_on_name(name):
     """
